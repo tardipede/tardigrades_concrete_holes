@@ -1,3 +1,9 @@
+# Big files
+/data/*
+/intermediates/01_trim/*
+/intermediates/02_filt/*
+/databases/db_all.fas
+
 # History files
 .Rhistory
 .Rapp.history

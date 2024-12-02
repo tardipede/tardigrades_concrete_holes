@@ -1,0 +1,22 @@
+## These are just random commands that I keep here as sometimes I forget them
+
+# git useful commands
+git status
+git add .
+git commit -m "git commit message"
+git push
+
+#Delete the most recent commit, keeping the work you've done:
+git reset --soft HEAD~1
+
+# conda/mamba useful commands
+conda env create -f ./conda_envs/environment.yml
+conda env update -f ./conda_envs/environment.yml
+conda env remove -n metabarcoding_env
+conda activate metabarcoding_env
+
+
+# To create a yml file from a conda env
+conda env export -n metabarcoding_env -f ./conda_envs/environment_detailed.yml
+
+
