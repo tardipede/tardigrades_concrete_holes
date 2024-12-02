@@ -26,6 +26,9 @@ parser$add_argument("--min_amplicon_size", help = "Minimum amplicon size to keep
 parser$add_argument("--max_amplicon_size", help = "Maximum amplicon size to keep")
 parser$add_argument("--processors", default = 12, help = "Number of processors for ASV classification and alignment")
 parser$add_argument("--clustering_treshold", default = 0.03, help = "Number of processors for ASV classification and alignment")
+parser$add_argument("--amplicon_size_step", default = 3, help = "Amplicon size step")
+parser$add_argument("--translation_frame", default = 1, help = "Translation frame for amplicon error check")
+
 
 arguments <- parser$parse_args()
 
@@ -42,8 +45,10 @@ FWD = arguments$forward_primer
 REV = arguments$reverse_primer
 min_amplicon_size = arguments$min_amplicon_size
 max_amplicon_size = arguments$max_amplicon_size
+amplicon_size_step = arguments$amplicon_size_step
 PROCESSORS = arguments$processors
 CLUSTERING_TRESHOLD = arguments$clustering_treshold
+TRANSLATION_FRAME = arguments$translation_frame
 
 # Load libraryes and custom scripts
 suppressPackageStartupMessages({
@@ -54,6 +59,7 @@ suppressPackageStartupMessages({
   library(ShortRead, quietly = TRUE)
   library(Biostrings, quietly = TRUE)
   library(DECIPHER, quietly = TRUE)
+  library(ape, quietly = TRUE)
   source("./code/999_utils.R")
   })
 
@@ -205,86 +211,92 @@ saveRDS(seqtab.nochim, file.path(backup_path, "savepoint1_seqtable.rds"))
 seqtab.nochim <- readRDS(file.path(backup_path, "savepoint1_seqtable.rds"))
 
 
-# Abundance filtering, length filtering
-# This step removes lots of erronneous sequences and saves a lot of RAM to the next steps
-seqtab.nochim.filtered_length <- 
-  seqtab.nochim[, nchar(colnames(seqtab.nochim)) >= min_amplicon_size & nchar(colnames(seqtab.nochim)) <= max_amplicon_size]
-seqtab.nochim.filtered_length.filtered_min_abundance <- 
-  seqtab.nochim.filtered_length[, apply(seqtab.nochim.filtered_length, 2, sum) >= 10] # filtering reads with counts < 10
-# sorting by abundance
-seqtab.nochim.filtered_length.filtered_min_abundance <- 
-  seqtab.nochim.filtered_length.filtered_min_abundance[, order(-colSums(seqtab.nochim.filtered_length.filtered_min_abundance))]
+# Abundance filtering
+seqtab.nochim_min_abundance <- 
+  seqtab.nochim[, apply(seqtab.nochim, 2, sum) >= 10] # filtering reads with counts < 10
 
 
-# Clustering
-seqtab_clustered = cluster_seqs(seqtab.nochim.filtered_length.filtered_min_abundance, 
-                                  nproc = PROCESSORS, 
-                                  cutoff = CLUSTERING_TRESHOLD, 
-                                  align = TRUE)
+# Run translation check and clustering separately for different lengths to save time and memory
+results_clustering = list()
+amplicon_sizes = seq(min_amplicon_size, max_amplicon_size, by = amplicon_size_step)
+
+for(i in 1:length(amplicon_sizes)){
+  seqtab_temp = seqtab.nochim_min_abundance[ ,nchar(colnames(seqtab.nochim_min_abundance)) == amplicon_sizes[i]]
+  seqtab_temp_trans = translation_filtering(seqtab_temp, frame = TRANSLATION_FRAME)
+  seqtab_temp_clust = cluster_seqs(seqtab_temp_trans, nproc = PROCESSORS, cutoff = CLUSTERING_TRESHOLD, align = F)
+  seqtab_temp_clust[[1]]$otu = paste0(seqtab_temp_clust[[1]]$otu,"_",amplicon_sizes[i])
+  seqtab_temp_clust[[2]]$otu = paste0(seqtab_temp_clust[[2]]$otu,"_",amplicon_sizes[i])
+  results_clustering[[i]] = seqtab_temp_clust
+  rm(seqtab_temp)
+  rm(seqtab_temp_trans)
+  rm(seqtab_temp_clust)
+}
 
 
+# Extract OTU table
+results_clustering_OTUs = lapply(results_clustering, FUN = function(x){x[[1]]}) 
+otu_seqtab = do.call(rbind,results_clustering_OTUs)
+otu_seqtab = otu_seqtab[order(rowSums(otu_seqtab[,2:(ncol(otu_seqtab)-1)]), decreasing = T),]
 
+otu_newnames = paste0("OTU_",1:nrow(otu_seqtab))
+otu_oldnames = otu_seqtab$otu
+otu_seqtab$otu = otu_newnames
 
+map_table_otu = data.frame(otu_newnames = otu_newnames, otu_oldnames = otu_oldnames)
 
+# Extract esv table
+results_clustering_asv = lapply(results_clustering, FUN = function(x){x[[2]]})   
+esv_seqtab = do.call(rbind,results_clustering_asv)
+esv_seqtab = esv_seqtab[order(rowSums(esv_seqtab[,2:(ncol(esv_seqtab)-2)]), decreasing = T),]
+esv_seqtab = merge(esv_seqtab, map_table_otu, by.x = "otu", by.y = "otu_oldnames")
 
+esv_seqtab_new = esv_seqtab[,colnames(esv_seqtab) %in% basename(sample_table$filt_R1)]
 
-
-
-
-# ASV classification
-trainingSet <- readRDS(DATABASE_PATH) # database loading
-ids <- DECIPHER::IdTaxa(dna, trainingSet, strand = "both", processors = 12)
-
-# exporting classification results
-output <- sapply(
-  ids,
-  function(id) {
-    paste(id$taxon,
-      " (",
-      round(id$confidence, digits = 1),
-      "%)",
-      sep = "",
-      collapse = "; "
-    )
-  }
-)
-
-otu_seqtab <- curated_result
-
-colnames(otu_seqtab) <- gsub("-", 
+colnames(esv_seqtab_new) <- gsub("-", 
                              ".", 
-                             sample_table$sample[match(colnames(otu_seqtab), 
+                             sample_table$sample[match(colnames(esv_seqtab_new), 
                                                        basename(sample_table$filt_R1))], 
                              fixed = TRUE)
 
-otu_seqtab <- cbind(data.frame(ASV = rownames(otu_seqtab)), 
-                    otu_seqtab)
-output <- cbind(data.frame(ASV = names(output)), 
-                data.frame(output = output))
-otutable_classified <- merge(output, 
-                             otu_seqtab, 
-                             by = "ASV")
+esv_seqtab_new$otu = esv_seqtab$otu
+esv_seqtab_new$sequence = esv_seqtab$sequence
 
-otutable_classified <- otutable_classified %>% 
-  select(output, everything())
-
-write.table(otutable_classified, 
-            file = paste0(OUTPUT_FOLDER,"/", RUN_NAME, "_classified_otus.csv"), 
+# Write ASV table as file
+write.table(esv_seqtab,
+            file.path(OUTPUT_FOLDER,paste0(RUN_NAME,"_ASV.tsv")), 
+            sep = "\t", 
             quote = FALSE, 
+            row.names = FALSE)
+
+# Save the OTU table as backup
+saveRDS(otu_seqtab, file.path(backup_path, "savepoint2_seqtable.rds"))
+# Read the sequence table (only a part of the script can be run from here)
+otu_seqtab <- readRDS(file.path(backup_path, "savepoint2_seqtable.rds"))
+
+
+
+# Saving OTU sequences to fasta file
+seqs_otu<-otu_seqtab$seq
+names_otu<-otu_seqtab$otu
+dna <- DNAStringSet(seqs_otu)
+names(dna) = names_otu
+Biostrings::writeXStringSet(dna, file.path(OUTPUT_FOLDER,paste0(RUN_NAME,"_OTU.fasta")))
+
+# Classify OTUs
+otus_classification = classify_blast(ape::read.FASTA(file.path(OUTPUT_FOLDER,paste0(RUN_NAME,"_OTU.fasta"))), DATABASE_PATH)
+
+classified_otu_table = cbind(otu_seqtab, otus_classification)
+
+col_newnames =   gsub("-", 
+                             ".", 
+                             sample_table$sample[match(colnames(classified_otu_table), 
+                                                       basename(sample_table$filt_R1))], 
+                             fixed = TRUE)
+
+colnames(classified_otu_table)[!is.na(col_newnames )] = col_newnames[!is.na(col_newnames )]
+
+write.table(classified_otu_table,
+            file.path(OUTPUT_FOLDER,paste0(RUN_NAME,"_classified_otutab.tsv")), 
+            quote = FALSE,
+            row.names = FALSE,
             sep = "\t")
-
-            # Align OTUs and save alignment
-aln <- DECIPHER::AlignSeqs(dna, processors = PROCESSORS)
-Biostrings::writeXStringSet(aln, 
-                            paste0(OUTPUT_FOLDER,"/", 
-                                   RUN_NAME, "_aligned_otus.fas"))
-
-
-# Make OTUs phylogenetic tree with Fastree
-system(paste0("FastTree -gtr -nt ",OUTPUT_FOLDER,"/", 
-              RUN_NAME, 
-              "_aligned_otus.fas > ",OUTPUT_FOLDER, "/", 
-              RUN_NAME, 
-              "_otus_phylotree.tre"))
-
-

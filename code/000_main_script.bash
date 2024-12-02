@@ -1,7 +1,6 @@
 #!/usr/bin/bash
 
 # Process raw reads into ASV tables
-
 Rscript code/001_coi_reads_process.R --input "./data"  \
                                            --intermediates "./intermediates" \
                                            --output "./results" \
@@ -15,19 +14,9 @@ Rscript code/001_coi_reads_process.R --input "./data"  \
                                            --max_amplicon_size 427 \
                                            --amplicon_size_step 3
 
-
-INPUT_FOLDER = "./data"
-INTERMEDIATE_FOLDER = "./intermediates"
-OUTPUT_FOLDER = "./results"
-RUN_NAME = "COI"
-FORWARD_READS_REGEX = ".*R1(_001)?.fastq.gz"
-REVERSE_READS_REGEX = ".*R2(_001)?.fastq.gz"
-RUN_REGEX = "(ID[0-9]{4})" 
-SAMPLE_REGEX = "((BL|IT)-[0-9]{3})"
-DATABASE_PATH = "./databases/db_all.fas"
-FWD = "GCNCCNGAYATRKSNTTYCC"
-REV = "TCDGGRTGNCCRAARAAYCA"
-min_amplicon_size = 415
-max_amplicon_size = 427
-amplicon_size_step = 3
-PROCESSORS = 12
+# Create phyloseq object
+Rscript code/002_make_phyloseq_object.R --otu_table "./results/COI_classified_otutab.tsv"  \
+                                        --sequences "./results/COI_OTU.fasta"  \
+                                        --samples_data "./samples_data.txt"  \
+                                        --run_name "COI" \
+                                        --output "./results"
