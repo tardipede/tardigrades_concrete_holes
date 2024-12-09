@@ -1,4 +1,4 @@
-# tardigrades_concrete_holes
+# Tardigrades in concrete holes - data analysis
 Tardigrades in concrete holes metabarcoding
 
 ## 1 - Create and activate the conda environment
