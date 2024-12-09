@@ -10,3 +10,16 @@ You can create and install the conda environment from the yml file by typing the
 conda env create -f ./conda_envs/environment.yml
 conda activate metabarcoding_env
 ```
+
+If you have issues with the environment.yml file, try with the environment_detailed.yml file where every dependency version is specified:
+```
+conda env create -f ./conda_envs/environment_detailed.yml
+conda activate metabarcoding_env
+```
+
+## 2 - Clone the repository
+Clone this repository with
+```
+git clone https://github.com/tardipede/tardigrades_concrete_holes.git
+cd microcosmos_rock_pools
+```
