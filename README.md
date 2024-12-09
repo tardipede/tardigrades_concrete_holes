@@ -1,5 +1,5 @@
 # Tardigrades in concrete holes - data analysis
-Tardigrades in concrete holes metabarcoding
+This repository contains the scripts for the data analysis associated with the paper: **PAPER NAME TO ADD **
 
 ## 1 - Create and activate the conda environment
 
