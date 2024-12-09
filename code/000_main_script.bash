@@ -12,7 +12,8 @@ Rscript code/001_coi_reads_process.R --input "./data"  \
                                            --reverse_primer "TCDGGRTGNCCRAARAAYCA" \
                                            --min_amplicon_size 415 \
                                            --max_amplicon_size 427 \
-                                           --amplicon_size_step 3
+                                           --amplicon_size_step 3 \
+                                           --translation_frame 2
 
 # Create phyloseq object
 Rscript code/002_make_phyloseq_object.R --otu_table "./results/COI_classified_otutab.tsv"  \
