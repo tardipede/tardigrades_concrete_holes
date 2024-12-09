@@ -20,3 +20,6 @@ Rscript code/002_make_phyloseq_object.R --otu_table "./results/COI_classified_ot
                                         --samples_data "./samples_data.txt"  \
                                         --run_name "COI" \
                                         --output "./results"
+
+# Run analysis and visualization
+Rscript code/003_analysis_and_visualization.R

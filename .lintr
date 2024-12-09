@@ -1,5 +1,6 @@
 exclusions: list(
     "code/001_coi_reads_process.R",
     "code/101_database_cutadapt.R",
+    "code/003_analysis_and_visualization.R",
     "code/999_utils.R"
  )
