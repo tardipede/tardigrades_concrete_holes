@@ -23,3 +23,5 @@ Clone this repository with
 git clone https://github.com/tardipede/tardigrades_concrete_holes.git
 cd microcosmos_rock_pools
 ```
+## 3 - Download reads
+Create in the working directory a folder named *data* and download there the files containing the raw reads
