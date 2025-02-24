@@ -25,3 +25,10 @@ cd microcosmos_rock_pools
 ```
 ## 3 - Download reads
 Create in the working directory a folder named *data* and download there the files containing the raw reads
+
+## 4 - Run analyses
+Make the scripts executable and rrn the analyses
+```
+chmod +x ./code/*
+bash code/000_main_script.bash
+```
